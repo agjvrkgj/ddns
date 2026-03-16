@@ -10,6 +10,10 @@ ZONE_ID="zone_id"
 RECORD_NAME="xx.xxxxxx.xyz"
 RECORD_TYPE="A"  # Use "A" for IPv4 or "AAAA" for IPv6
 
+# IP detection service — for servers in mainland China, use: https://4.ipw.cn / https://6.ipw.cn
+IP_SERVICE_V4="https://icanhazip.com"
+IP_SERVICE_V6="https://icanhazip.com"
+
 # ================= Dependency Check =================
 for cmd in curl jq; do
     if ! command -v "$cmd" &>/dev/null; then
@@ -22,8 +26,8 @@ done
 
 # Fetch current public IP based on record type
 case "$RECORD_TYPE" in
-    A)    CURRENT_IP=$(curl -s -4 --fail --connect-timeout 10 https://icanhazip.com | tr -d '[:space:]') ;;
-    AAAA) CURRENT_IP=$(curl -s -6 --fail --connect-timeout 10 https://icanhazip.com | tr -d '[:space:]') ;;
+    A)    CURRENT_IP=$(curl -s -4 --fail --connect-timeout 10 "$IP_SERVICE_V4" | tr -d '[:space:]') || true ;;
+    AAAA) CURRENT_IP=$(curl -s -6 --fail --connect-timeout 10 "$IP_SERVICE_V6" | tr -d '[:space:]') || true ;;
     *)
         echo "Error: Invalid RECORD_TYPE '$RECORD_TYPE'. Must be 'A' or 'AAAA'." >&2
         exit 1
@@ -40,7 +44,7 @@ CF_RESPONSE=$(curl -s --connect-timeout 10 \
     -H "X-Auth-Email: $EMAIL" \
     -H "X-Auth-Key: $GLOBAL_API_KEY" \
     -H "Content-Type: application/json" \
-    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?name=${RECORD_NAME}&type=${RECORD_TYPE}")
+    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records?name=${RECORD_NAME}&type=${RECORD_TYPE}") || true
 
 RECORD_ID=$(echo "$CF_RESPONSE"  | jq -r '.result[0].id      // empty')
 DNS_IP=$(echo "$CF_RESPONSE"     | jq -r '.result[0].content // empty')
@@ -68,7 +72,7 @@ UPDATE_RESULT=$(curl -s --connect-timeout 10 -X PUT \
         --arg name    "$RECORD_NAME" \
         --arg content "$CURRENT_IP" \
         '{type: $type, name: $name, content: $content, proxied: false}')" \
-    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}")
+    "https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/dns_records/${RECORD_ID}") || true
 
 if echo "$UPDATE_RESULT" | jq -e '.success == true' > /dev/null; then
     echo "Success: $RECORD_NAME ($RECORD_TYPE) updated to $CURRENT_IP"
