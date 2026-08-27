@@ -15,17 +15,100 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-for cmd in curl jq; do
-    if ! command -v "$cmd" &>/dev/null; then
-        echo "Error: '$cmd' is not installed. Install it and retry." >&2
+install_dependencies() {
+    local -a missing=() packages=()
+    local item package_manager=""
+
+    command -v curl &>/dev/null || missing+=(curl)
+    command -v jq &>/dev/null || missing+=(jq)
+    if { ! command -v cron &>/dev/null && ! command -v crond &>/dev/null; } || [[ ! -d /etc/cron.d ]]; then
+        missing+=(cron)
+    fi
+
+    if (( ${#missing[@]} == 0 )); then
+        echo "Dependencies already installed: curl, jq, cron"
+        return 0
+    fi
+
+    echo "Missing dependencies: ${missing[*]}"
+
+    if command -v apt-get &>/dev/null; then
+        package_manager="apt-get"
+        for item in "${missing[@]}"; do
+            packages+=("$item")
+        done
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}"
+    elif command -v dnf &>/dev/null; then
+        package_manager="dnf"
+        for item in "${missing[@]}"; do
+            [[ "$item" == "cron" ]] && packages+=(cronie) || packages+=("$item")
+        done
+        dnf install -y "${packages[@]}"
+    elif command -v yum &>/dev/null; then
+        package_manager="yum"
+        for item in "${missing[@]}"; do
+            [[ "$item" == "cron" ]] && packages+=(cronie) || packages+=("$item")
+        done
+        yum install -y "${packages[@]}"
+    elif command -v apk &>/dev/null; then
+        package_manager="apk"
+        for item in "${missing[@]}"; do
+            [[ "$item" == "cron" ]] && packages+=(cronie) || packages+=("$item")
+        done
+        apk add --no-cache "${packages[@]}"
+    else
+        echo "Error: No supported package manager found (apt-get, dnf, yum, or apk)." >&2
+        echo "Install curl, jq, and cron manually, then run this installer again." >&2
         exit 1
     fi
-done
 
-if [[ ! -d /etc/cron.d ]]; then
-    echo "Error: /etc/cron.d not found. Please install cron (e.g. apt/yum/dnf install cron) and retry." >&2
-    exit 1
-fi
+    echo "Dependencies installed with $package_manager."
+
+    for item in curl jq; do
+        if ! command -v "$item" &>/dev/null; then
+            echo "Error: Dependency installation finished, but '$item' is still unavailable." >&2
+            exit 1
+        fi
+    done
+
+    if ! command -v cron &>/dev/null && ! command -v crond &>/dev/null; then
+        echo "Error: Dependency installation finished, but cron is still unavailable." >&2
+        exit 1
+    fi
+
+    mkdir -p /etc/cron.d
+    chmod 755 /etc/cron.d
+}
+
+start_cron_service() {
+    if command -v systemctl &>/dev/null; then
+        if systemctl enable --now cron.service &>/dev/null || systemctl enable --now crond.service &>/dev/null; then
+            echo "Cron service enabled and started."
+            return 0
+        fi
+    fi
+
+    if command -v rc-update &>/dev/null && command -v rc-service &>/dev/null; then
+        rc-update add crond default &>/dev/null || true
+        if rc-service crond start &>/dev/null; then
+            echo "Cron service enabled and started."
+            return 0
+        fi
+    fi
+
+    if command -v service &>/dev/null; then
+        if service cron start &>/dev/null || service crond start &>/dev/null; then
+            echo "Cron service started."
+            return 0
+        fi
+    fi
+
+    echo "Warning: Could not start cron automatically. Verify that the cron service is running." >&2
+}
+
+install_dependencies
+start_cron_service
 
 # Reads from /dev/tty so interactive prompts work even when piped via curl | bash
 prompt() {

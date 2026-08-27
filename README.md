@@ -5,6 +5,9 @@ Automatically updates a Cloudflare DNS A/AAAA record with your current public IP
 ## Requirements
 
 - `curl`, `jq`, `cron`
+- Root access for installation
+
+The installer detects missing dependencies and installs them automatically on systems using `apt-get`, `dnf`, `yum`, or `apk`. It also attempts to enable and start the cron service.
 
 ## Installation
 
@@ -12,7 +15,7 @@ Automatically updates a Cloudflare DNS A/AAAA record with your current public IP
 curl -fsSL https://raw.githubusercontent.com/agjvrkgj/ddns/main/setup.sh | sudo bash
 ```
 
-The installer prompts for your Cloudflare credentials, update interval, and optional Telegram settings, then installs and schedules the updater automatically.
+The installer first installs any missing tools, then prompts for your Cloudflare credentials, update interval, and optional Telegram settings before scheduling the updater automatically.
 
 ## Telegram Notifications
 
