@@ -1,6 +1,6 @@
 # Cloudflare DDNS
 
-Automatically updates a Cloudflare DNS A/AAAA record with your current public IP.
+Automatically updates a Cloudflare DNS A/AAAA record with your current public IP, with optional Telegram notifications after successful changes.
 
 ## Requirements
 
@@ -9,15 +9,31 @@ Automatically updates a Cloudflare DNS A/AAAA record with your current public IP
 ## Installation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xhhcn/ddns/main/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/agjvrkgj/ddns/main/setup.sh | sudo bash
 ```
 
-Prompts for your Cloudflare credentials and update interval, then installs and schedules the updater automatically.
+The installer prompts for your Cloudflare credentials, update interval, and optional Telegram settings, then installs and schedules the updater automatically.
+
+## Telegram Notifications
+
+When enabled, the bot sends a message after Cloudflare successfully changes a DNS record. The notification includes the domain, record type, old IP, and new IP. Runs where the IP has not changed do not send a message.
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its Bot Token.
+2. Open the new bot and send it a message.
+3. Open `https://api.telegram.org/bot<BOT_TOKEN>/getUpdates` and find `message.chat.id` in the response.
+4. Enter the Bot Token and Chat ID when the installer asks whether to enable Telegram notifications.
+
+To enable notifications on an existing installation, edit `/usr/local/bin/cloudflare-ddns.sh` and set:
+
+```bash
+TELEGRAM_BOT_TOKEN="123456789:your_bot_token"
+TELEGRAM_CHAT_ID="123456789"
+```
 
 ## Manual Usage
 
-1. Edit `ddns.sh` and fill in the configuration section
-2. `bash ddns.sh`
+1. Edit `ddns.sh` and fill in the configuration section.
+2. Run `bash ddns.sh`.
 
 ## File Locations (after install)
 
@@ -37,7 +53,7 @@ IP_SERVICE_V4="https://4.ipw.cn"   # IPv4 (operated by IPIP.NET)
 IP_SERVICE_V6="https://6.ipw.cn"   # IPv6
 ```
 
-`api.cloudflare.com` is generally accessible from mainland China without additional configuration.
+`api.cloudflare.com` is generally accessible from mainland China without additional configuration. Telegram API connectivity may require a reachable network route.
 
 ## Uninstall
 

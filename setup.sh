@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # One-click Cloudflare DDNS installer
 # Usage: sudo bash setup.sh
-#   or : curl -fsSL https://raw.githubusercontent.com/xhhcn/ddns/main/setup.sh | sudo bash
+#   or : curl -fsSL https://raw.githubusercontent.com/agjvrkgj/ddns/main/setup.sh | sudo bash
 
 set -euo pipefail
 
-RAW_URL="https://raw.githubusercontent.com/xhhcn/ddns/main/ddns.sh"
+RAW_URL="https://raw.githubusercontent.com/agjvrkgj/ddns/main/ddns.sh"
 SCRIPT_PATH="/usr/local/bin/cloudflare-ddns.sh"
 LOG_FILE="/var/log/cloudflare-ddns.log"
 CRON_FILE="/etc/cron.d/cloudflare-ddns"
@@ -48,21 +48,43 @@ prompt ZONE_ID       "Zone ID"
 prompt RECORD_NAME   "Record Name (FQDN)"
 prompt RECORD_TYPE   "Record Type (A / AAAA)" "A"
 prompt CRON_INTERVAL "Update interval (minutes)" "5"
+prompt TELEGRAM_ENABLED "Enable Telegram notifications? (y/N)" "N"
+
+case "$TELEGRAM_ENABLED" in
+    y|Y|yes|YES|Yes)
+        prompt TELEGRAM_BOT_TOKEN "Telegram Bot Token"
+        prompt TELEGRAM_CHAT_ID   "Telegram Chat ID"
+        ;;
+    *)
+        TELEGRAM_BOT_TOKEN=""
+        TELEGRAM_CHAT_ID=""
+        ;;
+esac
 
 if ! [[ "$CRON_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
     echo "Error: Update interval must be a positive integer." >&2
     exit 1
 fi
 
+case "$RECORD_TYPE" in
+    A|AAAA) ;;
+    *)
+        echo "Error: Record Type must be A or AAAA." >&2
+        exit 1
+        ;;
+esac
+
 echo "Downloading ddns.sh..."
 curl -fsSL "$RAW_URL" -o "$SCRIPT_PATH"
-chmod +x "$SCRIPT_PATH"
+chmod 700 "$SCRIPT_PATH"
 
-sed -i "s|^GLOBAL_API_KEY=.*|GLOBAL_API_KEY=\"${API_KEY}\"|"   "$SCRIPT_PATH"
-sed -i "s|^EMAIL=.*|EMAIL=\"${EMAIL}\"|"                        "$SCRIPT_PATH"
-sed -i "s|^ZONE_ID=.*|ZONE_ID=\"${ZONE_ID}\"|"                 "$SCRIPT_PATH"
-sed -i "s|^RECORD_NAME=.*|RECORD_NAME=\"${RECORD_NAME}\"|"     "$SCRIPT_PATH"
-sed -i "s|^RECORD_TYPE=.*|RECORD_TYPE=\"${RECORD_TYPE}\"|"     "$SCRIPT_PATH"
+sed -i "s|^GLOBAL_API_KEY=.*|GLOBAL_API_KEY=\"${API_KEY}\"|"                 "$SCRIPT_PATH"
+sed -i "s|^EMAIL=.*|EMAIL=\"${EMAIL}\"|"                                    "$SCRIPT_PATH"
+sed -i "s|^ZONE_ID=.*|ZONE_ID=\"${ZONE_ID}\"|"                              "$SCRIPT_PATH"
+sed -i "s|^RECORD_NAME=.*|RECORD_NAME=\"${RECORD_NAME}\"|"                  "$SCRIPT_PATH"
+sed -i "s|^RECORD_TYPE=.*|RECORD_TYPE=\"${RECORD_TYPE}\"|"                  "$SCRIPT_PATH"
+sed -i "s|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=\"${TELEGRAM_BOT_TOKEN}\"|" "$SCRIPT_PATH"
+sed -i "s|^TELEGRAM_CHAT_ID=.*|TELEGRAM_CHAT_ID=\"${TELEGRAM_CHAT_ID}\"|"       "$SCRIPT_PATH"
 
 cat > "$CRON_FILE" <<EOF
 # Cloudflare DDNS - runs every ${CRON_INTERVAL} minute(s)

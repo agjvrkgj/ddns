@@ -10,6 +10,10 @@ ZONE_ID="zone_id"
 RECORD_NAME="xx.xxxxxx.xyz"
 RECORD_TYPE="A"  # Use "A" for IPv4 or "AAAA" for IPv6
 
+# Optional Telegram notification (sent only after a successful DNS update)
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
+
 # IP detection service — for servers in mainland China, use: https://4.ipw.cn / https://6.ipw.cn
 IP_SERVICE_V4="https://icanhazip.com"
 IP_SERVICE_V6="https://icanhazip.com"
@@ -23,6 +27,28 @@ for cmd in curl jq; do
 done
 
 # ================= Script Logic =================
+
+send_telegram_notification() {
+    local old_ip="$1"
+    local new_ip="$2"
+    local message response
+
+    # Telegram notifications are optional. Both values are required to enable them.
+    if [[ -z "$TELEGRAM_BOT_TOKEN" || -z "$TELEGRAM_CHAT_ID" ]]; then
+        return 0
+    fi
+
+    printf -v message \
+        '✅ Cloudflare DDNS 更新成功\n域名：%s\n记录类型：%s\nIP：%s → %s' \
+        "$RECORD_NAME" "$RECORD_TYPE" "$old_ip" "$new_ip"
+
+    if ! response=$(curl -sS --fail --connect-timeout 10 --max-time 20 \
+        -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+        --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+        --data-urlencode "text=${message}" 2>&1); then
+        echo "Warning: DDNS update succeeded, but Telegram notification failed: $response" >&2
+    fi
+}
 
 # Fetch current public IP based on record type
 case "$RECORD_TYPE" in
@@ -76,6 +102,7 @@ UPDATE_RESULT=$(curl -s --connect-timeout 10 -X PUT \
 
 if echo "$UPDATE_RESULT" | jq -e '.success == true' > /dev/null; then
     echo "Success: $RECORD_NAME ($RECORD_TYPE) updated to $CURRENT_IP"
+    send_telegram_notification "$DNS_IP" "$CURRENT_IP"
 else
     echo "Error: Update failed. Cloudflare API response:" >&2
     echo "$UPDATE_RESULT" | jq '.' >&2
